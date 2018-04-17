@@ -97,7 +97,12 @@ View(examination_new$ximp)
 
 examination_new$ximp <- format(round(examination_new$ximp,2), nsmall = 2)
 
-View(examination_new$ximp)
+y <- examination_new$ximp
+View(y)
+
+#to remove .00 in the sequence coloumn
+y <-transform(y, SEQN=as.numeric(SEQN))
+View(q)
 
 NCOL(examination_new$ximp)
 
@@ -105,3 +110,14 @@ write.csv(examination_new$ximp, "examination_full.csv")
 
 l <- read.csv("C:/Users/Lenovo-pc/Downloads/finalLabelsE10.csv") 
 View(l)
+
+install.packages('plyr')
+library(plyr)
+
+#join(df1, df2,
+#     type = "inner")
+
+x <- inner_join(y, l)
+View(x)
+
+
