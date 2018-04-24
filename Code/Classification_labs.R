@@ -91,20 +91,21 @@ corvar <- sort(unlist(corvar),decreasing = TRUE)
 model <- glm(is_diabetic~.,family = binomial(link = 'logit'),data = labs_final)
 summary(model)
 pick_labs <- labs_final[c(1,4,5,8,9,14,17,18,19,20,2)]
-sample_size <- floor(0.80*nrow(pick_labs))
-set.seed(123)
-train_ind <- sample(seq_len(nrow(pick_labs)), size = sample_size)
-train <- pick_labs[train_ind,]
-test <- pick_labs[-train_ind,]
-model1 <- glm(is_diabetic~.,family = binomial(link = 'logit'), data = train[-1])
-labs_predict <- predict(model1,test,type = "response")
-library(ROCR)
-pr <- prediction(labs_predict,test$is_diabetic)
-prf <- performance(pr,measure = "tpr",x.measure = "fpr")
-plot(prf)
-defaulted.pred <- ifelse(labs_predict > 0.6,1,0)
-conf_matrix <- table(defaulted.pred,test$is_diabetic)
-confusionMatrix(conf_matrix)
+
+#sample_size <- floor(0.80*nrow(pick_labs))
+#set.seed(123)
+#train_ind <- sample(seq_len(nrow(pick_labs)), size = sample_size)
+#train <- pick_labs[train_ind,]
+#test <- pick_labs[-train_ind,]
+#model1 <- glm(is_diabetic~.,family = binomial(link = 'logit'), data = train[-1])
+#labs_predict <- predict(model1,test,type = "response")
+#library(ROCR)
+#pr <- prediction(labs_predict,test$is_diabetic)
+#prf <- performance(pr,measure = "tpr",x.measure = "fpr")
+#plot(prf)
+#defaulted.pred <- ifelse(labs_predict > 0.6,1,0)
+#conf_matrix <- table(defaulted.pred,test$is_diabetic)
+#confusionMatrix(conf_matrix)
 
 pick_labs1 <- pick_labs[-7]
 View(pick_labs1)
@@ -122,7 +123,7 @@ library(ROCR)
 pr <- prediction(labs_predict,test$is_diabetic)
 prf <- performance(pr,measure = "tpr",x.measure = "fpr")
 plot(prf)
-defaulted.pred <- ifelse(labs_predict > 0.5,1,0)
+adefaulted.pred <- ifelse(labs_predict > 0.5,1,0)
 conf_matrix <- table(defaulted.pred,test$is_diabetic)
 library('caret')
 confusionMatrix(conf_matrix)
@@ -179,8 +180,27 @@ confusionMatrix(conf_martix_rf)
 
 install.packages('nnet')
 library('nnet')
-ideal <- class.ind(pick_labs1$is_diabetic)
-
+lm.fit <- glm(is_diabetic~., data = train)
+pr.lm <- predict(lm.fit, test[-10])
+MSE.lm <- sum((pr.lm - test$is_diabetic)^2)/nrow(test)
+apply(train, 2, function(x) sum(is.na(x)))
+maxs <- apply(pick_labs1, 2, max)
+mins <- apply(pick_labs1, 2, min)
+scaled <- as.data.frame(scale(pick_labs1, center = mins, scale = maxs - mins))
+index <- sample(1:nrow(pick_labs1),round(0.80*nrow(pick_labs1)))
+train_new <- scaled[index,]
+test_new <- scaled[-index,]
+install.packages('neuralnet')
+library(neuralnet)
+n <- names(train_new)
+f <- as.formula(paste("is_diabetic~", paste(n[!n %in% "is_diabetic"], collapse = "+")))
+nnet_model <- neuralnet(f, data = train_new, hidden = c(5,3),linear.output = FALSE, stepmax = 1e6)
+plot(nnet_model)
+pr.nn <- compute(nnet_model, test_new[,1:9])
+pr.nn_new <- pr.nn$net.result*(max(pick_labs1$is_diabetic)- min(pick_labs1$is_diabetic))+ min(pick_labs1$is_diabetic)
+test.r <- (test_new$is_diabetic)*(max(pick_labs1$is_diabetic) - min(pick_labs1$is_diabetic))+min(pick_labs1$is_diabetic)
+MSE.nn <- sum((test.r - pr.nn_new)^2)/nrow(test_new)
+print(paste(MSE.lm,MSE.nn))
 
 # GBM 
 
@@ -196,3 +216,23 @@ plot(prf_gbm)
 default.pred_gbm <- ifelse(predict_gbm > 0.4,1,0)
 conf_matrix_gbm1 <- table(default.pred_gbm,test$is_diabetic)
 confusionMatrix(conf_matrix_gbm1)
+
+# CART 
+library('rpart')
+library('rpart.plot')
+set.seed(123)
+#cart_tree <- rpart(is_diabetic~., data = train[-1],control = rpart.control(cp=0.0001))
+#printcp(cart_tree)
+#bestcp <- cart_tree$cptable[which.min(cart_tree$cptable[,"xerror"]),"CP"]
+#tree.pruned <- prune(cart_tree, cp = bestcp)
+#cart_predict <- predict(tree.pruned, data = test[-c(1,10)], type = "class")
+trctrl <- trainControl(method = "repeatedcv", number = 10,repeats = 3)
+set.seed(1234)
+dtree_fit <- train(as.factor(is_diabetic)~., data = train[-1], method = "rpart", parms = list(split = "information"), trControl = trctrl, tuneLength = 10)
+dtree_fit
+prp(dtree_fit$finalModel, box.palette = "Reds", tweak = 1.2)
+cart_predict <- predict(dtree_fit, newdata = test[-c(1,10)])
+conf_matrix_cart <- table(cart_predict, test$is_diabetic)
+confusionMatrix(conf_matrix_cart)
+
+
