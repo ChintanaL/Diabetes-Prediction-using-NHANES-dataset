@@ -1,5 +1,3 @@
-
-
 #install.packages("gplots")
 library(gplots)
 #install.packages("ROCR")
@@ -48,13 +46,20 @@ write.csv(test,"test.csv")
 #confusionMatrix(conf_matrix)
 
 # logistic Regression
-
+train <- read.csv('train_PCA.csv')
+train <- train[-1]
+test <- read.csv('test_PCA.csv')
+test <- test[-1]
 model1 <- glm(is_diabetic~.,family = binomial(link = 'logit'), data = train)
 x_predict <- predict(model1,test,type = "response")
 library(ROCR)
 pr <- ROCR::prediction(x_predict,test$is_diabetic)
 prf <- performance(pr,measure = "tpr",final.measure = "fpr")
-plot(prf)
+plot(prf, main = " lr_ROC Curve", ylab = " Sensitivity" , xlab = "1-Specificity")
+auc <- performance(pr, "auc")
+auc<- unlist(slot(auc, "y.values"))
+auc <- round(auc,4)
+legend(.2,.2,auc, title = "AUC")
 defaulted.pred <- ifelse(x_predict > 0.5,1,0)
 conf_matrix <- table(defaulted.pred,test$is_diabetic)
 library('caret')
@@ -68,6 +73,7 @@ nb_predict <- predict(naive_bayes_model, newdata = test,type = "class")
 #View(nb_predict)
 conf_matrix_nb <- table(nb_predict,test$is_diabetic)
 confusionMatrix(conf_matrix_nb)
+plot(naive_bayes_model)
 
 # SVM model
 #ncol(x)
@@ -78,18 +84,23 @@ svm_predict <- predict(svm_model,newdata = test)
 library(ROCR)
 pr_svm <- ROCR::prediction(svm_predict,test$is_diabetic)
 prf_svm <- performance(pr_svm,measure = "tpr",x.measure = "fpr")
-plot(prf_svm)
-default.pred_svm <- ifelse(svm_predict > 0.2, 1, 0)
-default.pred_svm2 <- ifelse(svm_predict > 0.3, 1, 0)
+plot(prf_svm,main = " SVM_ROC Curve", ylab = " Sensitivity" , xlab = "1-Specificity")
+abline(a=0,b=1)
+auc <- performance(pr_svm, "auc")
+auc<- unlist(slot(auc, "y.values"))
+auc <- round(auc,4)
+legend(.8,.2,auc, title = "AUC")
+#default.pred_svm <- ifelse(svm_predict > 0.2, 1, 0)
+#default.pred_svm2 <- ifelse(svm_predict > 0.3, 1, 0)
 default.pred_svm3 <- ifelse(svm_predict > 0.4, 1, 0)
 conf_matrix_svm <- table(default.pred_svm3,test$is_diabetic)
 confusionMatrix(conf_matrix_svm)
 
 
 # KNN model
-  
+
 normalize <- function(x){
-     return ((x-min(x))/(max(x)-min(x)))
+  return ((x-min(x))/(max(x)-min(x)))
 }
 str(train)
 norm_train <- as.data.frame(lapply(train[-c(1,3,4,5)], normalize))
@@ -115,7 +126,7 @@ library(dplyr)
 #str(final2)
 rf <- randomForest(as.factor(is_diabetic)~., ntree=100, data = train, importance=TRUE)
 rf
-varImpPlot(rf,sort = T,n.var = 31, main = "Important Variables")
+varImpPlot(rf)
 predict_rf <- predict(rf,test)
 View(predict_rf)
 conf_martix_rf <- table(predict_rf, test$is_diabetic)
@@ -180,7 +191,10 @@ confusionMatrix(tableNN)
 install.packages('gbm')
 library('gbm')
 library(caret)
-gbm_model = gbm(formula = is_diabetic~.,distribution = "bernoulli",data = train,n.trees = 2500,shrinkage = .01,n.minobsinnode = 20)
+gbm_model = gbm(formula = is_diabetic~.,distribution = "bernoulli",data = train,n.trees = 2500,shrinkage = .01,n.minobsinnode = 20, cv.folds = 5)
+best.iter <- gbm.perf(gbm_model, method = "cv")
+best.iter
+summary(gbm_model)
 predict_gbm <- predict(object = gbm_model,newdata = test,n.trees = 1500,type = "response")
 conf_matrix_gbm <- data.frame("Actual"= test$is_diabetic, "predicted" = predict_gbm)
 library(ROCR)
@@ -189,7 +203,11 @@ g<- as.data.frame(t(test$is_diabetic))
 #View(test)
 pr_gbm <- prediction(predict_gbm,test[,7])
 prf_gbm <- performance(pr_gbm,measure = "tpr",x.measure = "fpr")
-plot(prf_gbm)
+plot(prf_gbm,main = " gbm_ROC Curve", ylab = " Sensitivity" , xlab = "1-Specificity")
+auc <- performance(pr_gbm, "auc")
+auc<- unlist(slot(auc, "y.values"))
+auc <- round(auc,4)
+legend(.8,.2,auc, title = "AUC")
 default.pred_gbm <- ifelse(predict_gbm > 0.4,1,0)
 #default.pred_gbm2 <- ifelse(predict_gbm > 0.2,1,0)
 conf_matrix_gbm1 <- table(default.pred_gbm,test[,7])
@@ -212,11 +230,19 @@ set.seed(1234)
 dtree_fit <- train(as.factor(is_diabetic)~., data = train, method = "rpart", parms = list(split = "information"), trControl = trctrl, tuneLength = 10)
 dtree_fit
 prp(dtree_fit$finalModel, box.palette = "Reds", tweak = 1.2)
-cart_predict <- predict(dtree_fit, newdata = test[,-c(7)])
+cart_predict <- predict(dtree_fit, newdata = test[,-(7)])
 conf_matrix_cart <- table(cart_predict, test$is_diabetic)
 confusionMatrix(conf_matrix_cart)
 
+# Decision Tree
+install.packages('rattle')
+install.packages('RColorBrewer')
+library('rattle')
+library('RColorBrewer')
 
-# Lasso GLM NET for L1 regularisation
-
-
+dectree <- rpart(is_diabetic~., data = train, method = "class", parms = list(split = "information"))
+summary(dectree)
+fancyRpartPlot(dectree)
+preddecTree <- predict(dectree, test, type = "class")
+conf_matrix_dectree <- table(preddecTree,test$is_diabetic)
+confusionMatrix(conf_matrix_dectree)
