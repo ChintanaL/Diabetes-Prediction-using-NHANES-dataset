@@ -22,6 +22,8 @@ tbl1<-table(DemographicAnalysis$final_IsDia, DemographicAnalysis$HHIncome)
 chisq.test(tbl1) 
 
 
+
+
 tbl2<-table(DemographicAnalysis$final_IsDia, DemographicAnalysis$PovertyRatio)
 chisq.test(tbl2) 
 ## Refactoring 

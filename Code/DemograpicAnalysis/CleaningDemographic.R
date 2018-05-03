@@ -70,7 +70,11 @@ levels(demographicData$Citizenship)
 names(demographicData)[15]<-"USStayLength"
 demographicData$USStayLength <- as.factor(demographicData$USStayLength)
 levels(demographicData$USStayLength) <- c("<1","1-5","5-10","10-15","15-20","20-30","30-40","40-50",">50","Refused","DontKnow")
+barplot(table(demographicData$USStayLength))
 levels(demographicData$USStayLength)
+table(demographicData$USStayLength)
+
+
 
 #Prepping Education Status Columns
 
@@ -81,15 +85,19 @@ demographicData$EduLevelAdult <- as.factor(demographicData$EduLevelAdult)
 levels(demographicData$EduLevelChild)
 levels(demographicData$EduLevelAdult)
 levels(demographicData$EduLevelChild) <- c("NoEdu/KG","1Grade","2Grade","3Grade","4Grade","5Grade","6Grade","7Grade","8Grade","9Grade","10Grade","11Grade","12Grade","HighSchool","GED",">HighSchool",">5Grade",">9Grade","DontKnow")
-#levels(demographicData$EduLevelAdult) <- c(">9Grade","9-11Grade","HighSchool/GED","College/AA","College/Above","Refused","DontKnow")
-levels(demographicData$EduLevelAdult) <- c(">9Grade","9-11Grade","HighSchool/GED","College/AA","College/Above","Refused","DontKnow","NoEdu/KG","1Grade","2Grade","3Grade","4Grade","5Grade","6Grade","7Grade","8Grade","9Grade","10Grade","11Grade","12Grade","HighSchool","GED",">HighSchool",">5Grade",">9Grade","Elementary")
-#levels(demographicData$EduLevelAdult) <- c("Elementary","HighSchool/GED","HighSchool/GED","College/AA","College/AA","Refused","DontKnow","NoEdu/KG","Elementary","Elementary","Elementary","Elementary","Elementary","Elementary","Elementary","Elementary","HighSchool/GED","HighSchool/GED","HighSchool/GED","HighSchool/GED","HighSchool/GED","HighSchool/GED","HighSchool/GED","Elementary","HighSchool/GED","Elementary")
+levels(demographicData$EduLevelAdult) <- c("<9Grade","9-11Grade","HighSchool/GED","College/AA","College/Above","Refused","DontKnow")
+levels(demographicData$EduLevelAdult) <- c("<9Grade","9-11Grade","HighSchool/GED","College/AA","College/Above","Refused","DontKnow","NoEdu/KG","1Grade","2Grade","3Grade","4Grade","5Grade","6Grade","7Grade","8Grade","9Grade","10Grade","11Grade","12Grade","HighSchool","GED",">HighSchool",">5Grade",">9Grade","Elementary")
 
+levels(demographicData$USStayLength)
+table(demographicData$USStayLength)
 
-
+plot(demographicData$EduLevelChild)
+plot(demographicData$EduLevelAdult)
 
 indicesNAEdu<-which(is.na(demographicData$EduLevelAdult))
 demographicData$EduLevelAdult[indicesNAEdu]<-demographicData$EduLevelChild[indicesNAEdu]
+
+levels(demographicData$EduLevelAdult) <- c("Elementary","HighSchool/GED","HighSchool/GED","College/AA","College/AA","Refused","DontKnow","NoEdu/KG","Elementary","Elementary","Elementary","Elementary","Elementary","Elementary","Elementary","Elementary","HighSchool/GED","HighSchool/GED","HighSchool/GED","HighSchool/GED","HighSchool/GED","HighSchool/GED","HighSchool/GED","Elementary","HighSchool/GED","Elementary")
 
 
 
@@ -141,12 +149,50 @@ colnames(demographicData)
 
 #######
 
+## missing vales
+colnames(demographicData)
+
+model1 <- glm(EduLevelAdult~.,family = binomial(link = 'logit'), data = demographicData)
+x_predict <- predict(model1,testPCA,type = "response")
+library(ROCR)
+pr <- ROCR::prediction(x_predict,test$is_diabetic)
+prf <- performance(pr,measure = "tpr",final.measure = "fpr")
+plot(prf)
+defaulted.pred <- ifelse(x_predict > 0.5,1,0)
+conf_matrix <- table(defaulted.pred,test$is_diabetic)
+library('caret')
+confusionMatrix(conf_matrix)
+
+library("nnet")
+
+multi <- multinom(EduLevelAdult ~AgeYears+PovertyRatio+PeopleFamily, data = demographicData)
+summary(multi)
+## Z-value
+z <- summary(multi)$coefficients/summary(multi)$standard.errors
+z
+
+#p-value
+p <- (1 - pnorm(abs(z), 0, 1))*2
+ p
+ 
+
+
+
+predicted=predict(multi,demographicData,type="probs")
+head(predicted)
+dim(predicted)
+predicted<-as.data.frame(predicted)
+# We have the 5 probabilies for 5 categories 
+
+
+#Now assign the category which has the highest probability
+newalues<-colnames(predicted)[max.col(predicted,ties.method="first")]
+demographicData['EduLevelAdultNew']<-newalues
+
+
 
 
 ###
-
-
-
 
 write.csv(demographicData,"demographic_new.csv")
 
@@ -171,5 +217,7 @@ lm(demographicData$MaritalStatus~demographicData$FamilyIncome+ demographicData$G
 colnames(demographicData)
 summary(demographicData)
 levels(demographicData$FamilyIncome)
+
+
 
 
